@@ -96,6 +96,7 @@ public class XMLConfigBuilder extends BaseBuilder {
       throw new BuilderException("Each XMLConfigBuilder can only be used once.");
     }
     parsed = true;
+    //将解析后的键值对设置到Configuration实例的相关变量中
     parseConfiguration(parser.evalNode("/configuration"));
     return configuration;
   }
@@ -117,6 +118,7 @@ public class XMLConfigBuilder extends BaseBuilder {
       environmentsElement(root.evalNode("environments"));
       databaseIdProviderElement(root.evalNode("databaseIdProvider"));
       typeHandlerElement(root.evalNode("typeHandlers"));
+      // 解析mappers节点，定义映射器，也就是SQL映射语句。mappers中定义好映射文件的位置即可。
       mapperElement(root.evalNode("mappers"));
     } catch (Exception e) {
       throw new BuilderException("Error parsing SQL Mapper Configuration. Cause: " + e, e);
@@ -366,9 +368,12 @@ public class XMLConfigBuilder extends BaseBuilder {
     if (parent != null) {
       for (XNode child : parent.getChildren()) {
         if ("package".equals(child.getName())) {
+          // 子元素为package时，mybatis将包名下所有的接口认为是mapper类。创建其类对象并添加到mapperRegistry中。
+          // 此时一般是注解方式，不需要使用XML mapper文件
           String mapperPackage = child.getStringAttribute("name");
           configuration.addMappers(mapperPackage);
         } else {
+          // 子元素为mapper时，读取子元素的resource或url或class属性。
           String resource = child.getStringAttribute("resource");
           String url = child.getStringAttribute("url");
           String mapperClass = child.getStringAttribute("class");
@@ -386,6 +391,7 @@ public class XMLConfigBuilder extends BaseBuilder {
             }
           } else if (resource == null && url == null && mapperClass != null) {
             Class<?> mapperInterface = Resources.classForName(mapperClass);
+            //解析完成后最终都调用的该方法
             configuration.addMapper(mapperInterface);
           } else {
             throw new BuilderException("A mapper element may only specify a url, resource or class, but not more than one.");

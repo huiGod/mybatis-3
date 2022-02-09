@@ -113,6 +113,7 @@ public class MapperAnnotationBuilder {
   }
 
   public void parse() {
+    // type为mapper接口类
     String resource = type.toString();
     if (!configuration.isResourceLoaded(resource)) {
       loadXmlResource();
@@ -120,6 +121,7 @@ public class MapperAnnotationBuilder {
       assistant.setCurrentNamespace(type.getName());
       parseCache();
       parseCacheRef();
+      // 遍历mapper接口的各个方法，然后解析方法上的注解
       for (Method method : type.getMethods()) {
         if (!canHaveStatement(method)) {
           continue;
@@ -294,6 +296,7 @@ public class MapperAnnotationBuilder {
   }
 
   void parseStatement(Method method) {
+    // 反射获取入参类型和@Lang注解，为构建SqlSource做准备
     final Class<?> parameterTypeClass = getParameterType(method);
     final LanguageDriver languageDriver = getLanguageDriver(method);
 
@@ -355,6 +358,7 @@ public class MapperAnnotationBuilder {
         }
       }
 
+      // 利用上面解析得到的sqlSource等变量构建mappedStatement
       assistant.addMappedStatement(
           mappedStatementId,
           sqlSource,

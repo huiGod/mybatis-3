@@ -57,18 +57,24 @@ public class MapperRegistry {
     return knownMappers.containsKey(type);
   }
 
+  // 添加mapperClass到map中保存起来，并解析它的注解
   public <T> void addMapper(Class<T> type) {
+    // 我们定义的mybatis的mapper类必须是一个接口
     if (type.isInterface()) {
+      // 已经添加过了的mapper就不再添加了
       if (hasMapper(type)) {
         throw new BindingException("Type " + type + " is already known to the MapperRegistry.");
       }
       boolean loadCompleted = false;
       try {
+        // 将新解析的mapper接口类添加到map中
         knownMappers.put(type, new MapperProxyFactory<>(type));
         // It's important that the type is added before the parser is run
         // otherwise the binding may automatically be attempted by the
         // mapper parser. If the type is already known, it won't try.
+        // 解析Mapper接口的各项注解，比如@Select，这是最关键的地方
         MapperAnnotationBuilder parser = new MapperAnnotationBuilder(config, type);
+        // 遍历Mapper接口类的每个方法，解析其注解，生成MappedStatement，SqlSource和BoundSql三大主要对象
         parser.parse();
         loadCompleted = true;
       } finally {

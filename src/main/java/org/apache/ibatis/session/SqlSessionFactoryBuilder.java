@@ -60,6 +60,13 @@ public class SqlSessionFactoryBuilder {
     }
   }
 
+
+  /**
+   * 用来创建SqlSessionFactory实例，典型的builder链式创建模式
+   * 过建造者模式创建一个工厂类，配置解析的过程全部只解析了两种文件。一个是 mybatis-config.xml 全局配置文件。另外就是可能有很多个的 Mapper.xml 文件，也包 括在 Mapper 接口类上面定义的注解
+   * @param inputStream
+   * @return
+   */
   public SqlSessionFactory build(InputStream inputStream) {
     return build(inputStream, null, null);
   }
@@ -72,9 +79,21 @@ public class SqlSessionFactoryBuilder {
     return build(inputStream, null, properties);
   }
 
+  /**
+   * 1. mybatis读取全局xml配置文件，解析XML中各个节点元素
+   * 2. 将节点元素键值对，设置到Configuration实例的相关变量中
+   * 3. 由Configuration实例创建SqlSessionFactory(DefaultSqlSessionFactory实现类)单例对象
+   * @param inputStream
+   * @param environment
+   * @param properties
+   * @return
+   */
   public SqlSessionFactory build(InputStream inputStream, String environment, Properties properties) {
     try {
+      // 先构建XML文件解析器
       XMLConfigBuilder parser = new XMLConfigBuilder(inputStream, environment, properties);
+      // 解析得到Configuration对象，这个对象包含了几乎所有的mybatis配置文件中的信息，十分关键。
+      // 然后利用Configuration对象构建SqlSessionFactory单例
       return build(parser.parse());
     } catch (Exception e) {
       throw ExceptionFactory.wrapException("Error building SqlSession.", e);
@@ -88,6 +107,11 @@ public class SqlSessionFactoryBuilder {
     }
   }
 
+  /**
+   * 创建单例的DefaultSqlSessionFactory
+   * @param config
+   * @return
+   */
   public SqlSessionFactory build(Configuration config) {
     return new DefaultSqlSessionFactory(config);
   }

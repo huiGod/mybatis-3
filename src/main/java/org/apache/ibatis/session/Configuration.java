@@ -860,6 +860,8 @@ public class Configuration {
     mapperRegistry.addMappers(packageName);
   }
 
+  // configuration包含了几乎所有的配置信息，是配置的门面，十分复杂。
+  // 故采用外观模式和代理模式，将真正实现下沉到各个子系统中。这样通过分层可以解耦和降低复杂度
   public <T> void addMapper(Class<T> type) {
     mapperRegistry.addMapper(type);
   }
