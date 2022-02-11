@@ -42,6 +42,10 @@ public class DefaultSqlSessionFactory implements SqlSessionFactory {
     this.configuration = configuration;
   }
 
+  /**
+   * SqlSessionFactory单例创建并开启一个sqlSession实例。sqlSession线程不安全，一般存放在局部作用域中，用完close即可。
+   * @return
+   */
   @Override
   public SqlSession openSession() {
     return openSessionFromDataSource(configuration.getDefaultExecutorType(), null, false);
@@ -87,13 +91,35 @@ public class DefaultSqlSessionFactory implements SqlSessionFactory {
     return configuration;
   }
 
+  /**
+   * mybatis先由初始化阶段创建在configuration中的environment变量来创建数据库事务，
+   * 然后根据XML配置文件的settings节点中设置的defaultExecutorType来创建调度器Executor，
+   * 最后就可以创建得到DefaultSqlSession实例了
+   * @param execType
+   * @param level
+   * @param autoCommit
+   * @return
+   */
   private SqlSession openSessionFromDataSource(ExecutorType execType, TransactionIsolationLevel level, boolean autoCommit) {
     Transaction tx = null;
     try {
+      // 获取configuration的environment，它代表了运行的数据库环境，
+      // 由配置文件中的environments节点的environment子节点生成，创建SqlSessionFactory时指定其id，默认为default
       final Environment environment = configuration.getEnvironment();
+
+      // environment实例中取出transactionFactory成员变量，然后实例化它。
+      // JdbcTransactionFactory创建JdbcTransaction，使用JDBC代理管理commit等事务
+      // ManagedTransactionFactory创建ManagedTransaction，自身不对事务进行处理，完全交给容器，如Spring
       final TransactionFactory transactionFactory = getTransactionFactoryFromEnvironment(environment);
       tx = transactionFactory.newTransaction(environment.getDataSource(), level, autoCommit);
+
+      // 由事务transaction创建调度器Executor，SqlSession的几乎所有方法都是通过代理模式由Executor真正实现
+      // Executor代表调度器，由他来调度StatementHandler ParameterHandler ResultSetHandler。四者合称SqlSession四大组件
+      // ExecutorType在XML配置文件的settings节点中设置(defaultExecutorType), 可以取SIMPLE REUSE BATCH，默认为SIMPLE
+      // SIMPLE表示简易执行器，REUSE为一种执行器重用预处理语句，BATCH则为批量专用的执行器
       final Executor executor = configuration.newExecutor(tx, execType);
+
+      // 构造SqlSession实例，mybatis默认的实现类为DefaultSqlSession
       return new DefaultSqlSession(configuration, executor, autoCommit);
     } catch (Exception e) {
       closeTransaction(tx); // may have fetched a connection so lets call close()

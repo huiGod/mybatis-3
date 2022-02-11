@@ -58,8 +58,15 @@ public class SimpleExecutor extends BaseExecutor {
     Statement stmt = null;
     try {
       Configuration configuration = ms.getConfiguration();
+
+      // 创建StatementHandler，用来执行sql语句。SimpleExecutor创建的是RoutingStatementHandler。
+      // 它的是一个门面类，几乎所有方法都是通过代理来实现。代理则由配置XML settings节点的statementType区分。故仅仅是一个分发和路由
       StatementHandler handler = configuration.newStatementHandler(wrapper, ms, parameter, rowBounds, resultHandler, boundSql);
+
+      // 构造Statement
       stmt = prepareStatement(handler, ms.getStatementLog());
+
+      // 通过语句执行器的query方法进行查询, 查询结果通过resultHandler处理后返回
       return handler.query(stmt, resultHandler);
     } finally {
       closeStatement(stmt);
@@ -83,8 +90,11 @@ public class SimpleExecutor extends BaseExecutor {
 
   private Statement prepareStatement(StatementHandler handler, Log statementLog) throws SQLException {
     Statement stmt;
+    // 开启数据库连接，创建Connection对象。JdbcTransaction事务直接通过JDBC创建connection
     Connection connection = getConnection(statementLog);
+    // 初始化statement并设置期相关变量，不同的StatementHandler实现不同
     stmt = handler.prepare(connection, transaction.getTimeout());
+    // 设置parameterHandler，对于SimpleStatementHandler来说不用处理
     handler.parameterize(stmt);
     return stmt;
   }

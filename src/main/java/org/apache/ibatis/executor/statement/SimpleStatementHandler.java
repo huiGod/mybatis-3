@@ -70,8 +70,14 @@ public class SimpleStatementHandler extends BaseStatementHandler {
 
   @Override
   public <E> List<E> query(Statement statement, ResultHandler resultHandler) throws SQLException {
+
+    // 获取存放在boundSql中的sql执行语句
     String sql = boundSql.getSql();
+
+    // 通过JDBC sql的statement，直接执行sql语句。入参在statement预编译时进行了转换并设置到statement中了。
     statement.execute(sql);
+
+    // resultSetHandler处理查询结果，并返回
     return resultSetHandler.handleResultSets(statement);
   }
 

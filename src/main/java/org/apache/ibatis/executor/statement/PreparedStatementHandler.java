@@ -60,8 +60,11 @@ public class PreparedStatementHandler extends BaseStatementHandler {
 
   @Override
   public <E> List<E> query(Statement statement, ResultHandler resultHandler) throws SQLException {
+    // PREPARE方式下，sql statement进行了预编译，并注入了入参。它是一个PreparedStatement类型
     PreparedStatement ps = (PreparedStatement) statement;
+    // 直接调用JDBC PreparedStatement的execute方法操作数据库
     ps.execute();
+    // 结果集处理
     return resultSetHandler.handleResultSets(ps);
   }
 

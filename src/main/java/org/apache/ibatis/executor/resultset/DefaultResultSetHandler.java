@@ -178,6 +178,15 @@ public class DefaultResultSetHandler implements ResultSetHandler {
   //
   // HANDLE RESULT SETS
   //
+  // 通过JDBC完成数据库的操作后，我们就拿到了原始的数据库结果了。此时要将数据库结果集ResultSet转换为Java POJO。
+  // 这一步通过mybatis四大组件之一的ResultSetHandler来实现。ResultSetHandler默认实现类为DefaultResultSetHandler，
+  // 用户也可以通过插件的方式覆盖它。插件在xml配置文件的plugins子节点下添加
+
+  //1.从JDBC操作数据库后的statement中取出结果集ResultSet
+  //2.获取resultMaps, 它们定义了数据库结果集到Java POJO的映射关系
+  //3.一条条处理resultSet，调用handleResultSet做数据库列到Java属性的映射
+  //4.处理嵌套的resultMap，即映射结果中的某些子属性也需要resultMap映射时
+  //5.构造成List，将处理后的结果集返回
   @Override
   public List<Object> handleResultSets(Statement stmt) throws SQLException {
     ErrorContext.instance().activity("handling results").object(mappedStatement.getId());
@@ -185,26 +194,40 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     final List<Object> multipleResults = new ArrayList<>();
 
     int resultSetCount = 0;
+    // 1 从JDBC操作数据库后的statement中取出结果集ResultSet
     ResultSetWrapper rsw = getFirstResultSet(stmt);
 
+    // 2 获取resultMaps， mapper.xml中设置，并在mybatis初始化阶段存入mappedStatement中。
+    // resultMap定义了jdbc列到Java属性的映射关系，可以解决列名和Java属性名不一致，关联数据库映射等诸多问题。
+    // 它是mybatis中比较复杂的地方，同时也大大扩展了mybatis的功能
     List<ResultMap> resultMaps = mappedStatement.getResultMaps();
     int resultMapCount = resultMaps.size();
     validateResultMapsCount(rsw, resultMapCount);
+
+    // 3 一条条处理resultSet
     while (rsw != null && resultMapCount > resultSetCount) {
+      // 取出一条resultMap，即结果映射
       ResultMap resultMap = resultMaps.get(resultSetCount);
+      // 进行数据库列到Java属性的映射
       handleResultSet(rsw, resultMap, multipleResults, null);
+      // 取出下一条resultSet
       rsw = getNextResultSet(stmt);
+      // 清空nestedResultObjects，即嵌套的Result结果集
       cleanUpAfterHandlingResultSet();
       resultSetCount++;
     }
 
+    // 4 处理嵌套的resultMap，即映射结果中的某些子属性也需要resultMap映射时
     String[] resultSets = mappedStatement.getResultSets();
     if (resultSets != null) {
       while (rsw != null && resultSetCount < resultSets.length) {
+        // 取出父ResultMapping，用于嵌套情况
         ResultMapping parentMapping = nextResultMaps.get(resultSets[resultSetCount]);
         if (parentMapping != null) {
+          // 通过嵌套ResultMap的id，取出ResultMap
           String nestedResultMapId = parentMapping.getNestedResultMapId();
           ResultMap resultMap = configuration.getResultMap(nestedResultMapId);
+          // 处理ResultSet
           handleResultSet(rsw, resultMap, null, parentMapping);
         }
         rsw = getNextResultSet(stmt);
@@ -213,6 +236,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
       }
     }
 
+    // 5 构造成List，将处理后的结果集返回
     return collapseSingleResultList(multipleResults);
   }
 
@@ -292,16 +316,21 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     }
   }
 
+  //其中的关键是handleResultSet()方法进行数据库列到Java属性的映射，也是ORM关键所在
   private void handleResultSet(ResultSetWrapper rsw, ResultMap resultMap, List<Object> multipleResults, ResultMapping parentMapping) throws SQLException {
     try {
       if (parentMapping != null) {
+        // parentMapping不为空，表示处理的是嵌套resultMap中的子resultMap
         handleRowValues(rsw, resultMap, null, RowBounds.DEFAULT, parentMapping);
       } else {
+        // 非嵌套resultMap
         if (resultHandler == null) {
+          // 用户没有自定义resultHandler时，采用DefaultResultHandler。并将最终的处理结果添加到multipleResults中
           DefaultResultHandler defaultResultHandler = new DefaultResultHandler(objectFactory);
           handleRowValues(rsw, resultMap, defaultResultHandler, rowBounds, null);
           multipleResults.add(defaultResultHandler.getResultList());
         } else {
+          // 用户定义了resultHandler时，采用用户自定义的resultHandler
           handleRowValues(rsw, resultMap, resultHandler, rowBounds, null);
         }
       }
@@ -322,10 +351,12 @@ public class DefaultResultSetHandler implements ResultSetHandler {
 
   public void handleRowValues(ResultSetWrapper rsw, ResultMap resultMap, ResultHandler<?> resultHandler, RowBounds rowBounds, ResultMapping parentMapping) throws SQLException {
     if (resultMap.hasNestedResultMaps()) {
+      // 有嵌套resultMap时
       ensureNoRowBounds();
       checkResultHandler();
       handleRowValuesForNestedResultMap(rsw, resultMap, resultHandler, rowBounds, parentMapping);
     } else {
+      // 无嵌套resultMap时
       handleRowValuesForSimpleResultMap(rsw, resultMap, resultHandler, rowBounds, parentMapping);
     }
   }

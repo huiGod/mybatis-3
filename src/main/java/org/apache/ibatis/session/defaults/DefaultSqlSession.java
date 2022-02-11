@@ -42,12 +42,13 @@ import org.apache.ibatis.session.SqlSession;
 /**
  * The default implementation for {@link SqlSession}.
  * Note that this class is not Thread-Safe.
- *
+ * SqlSession的默认实现，非线程安全
  * @author Clinton Begin
  */
 public class DefaultSqlSession implements SqlSession {
 
   private final Configuration configuration;
+  //其中executor成员最为关键，DefaultSqlSession的大部分方法均是通过它来代理实现。比如select update方法。而delete和insert方法均调用update方法来实现
   private final Executor executor;
 
   private final boolean autoCommit;
@@ -73,6 +74,7 @@ public class DefaultSqlSession implements SqlSession {
   @Override
   public <T> T selectOne(String statement, Object parameter) {
     // Popular vote was to return null on 0 results and throw exception on too many.
+    // selectOne本质上是调用selectList实现，如果结果集大于一个，则报TooManyResultsException。
     List<T> list = this.selectList(statement, parameter);
     if (list.size() == 1) {
       return list.get(0);
@@ -145,9 +147,17 @@ public class DefaultSqlSession implements SqlSession {
     return selectList(statement, parameter, rowBounds, Executor.NO_RESULT_HANDLER);
   }
 
+  // 由sql语句的标示statement和入参parameter，查询满足条件的数据列表
+  // @Param statement: mapper.xml中mapper节点下的select delete update insert等子节点的id属性
+  // @Param parameter: 传入sql语句的入参
+  // @Param rowBounds: 逻辑分页，包含offset和limit两个主要成员变量。mybatis分页逻辑为舍弃offset之前条目，取剩下的limit条。默认DEFAULT不分页
   private <E> List<E> selectList(String statement, Object parameter, RowBounds rowBounds, ResultHandler handler) {
     try {
+      // 从mappers节点初始化阶段创建好的mappedStatements这个Map中，找到key为当前要找到的sql的id的那条
       MappedStatement ms = configuration.getMappedStatement(statement);
+      //交给 Executor 代理执行底层逻辑
+      // 通过执行器Executor作为总调度来执行查询语句
+      // BatchExecutor ReuseExecutor SimpleExecutor均继承了BaseExecutor
       return executor.query(ms, wrapCollection(parameter), rowBounds, handler);
     } catch (Exception e) {
       throw ExceptionFactory.wrapException("Error querying database.  Cause: " + e, e);

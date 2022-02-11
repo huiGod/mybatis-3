@@ -77,12 +77,18 @@ public class MapperProxy<T> implements InvocationHandler, Serializable {
     lookupConstructor = lookup;
   }
 
+  // 调用mapper接口中方法时的入口，Proxy会回调InvocationHandler的invoke方法
+  // @Param proxy: Java反射的动态代理对象，getMapper()中通过Java反射 Proxy.newProxyInstance()生成的动态代理
+  // @Param method: 要调用的接口方法
+  // @Param args: 方法入参
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
     try {
+      // 如果是Object对象的方法直接执行
       if (Object.class.equals(method.getDeclaringClass())) {
         return method.invoke(this, args);
       } else {
+        //最终调用的是mapperMethod的 execute 方法
         return cachedInvoker(method).invoke(proxy, method, args, sqlSession);
       }
     } catch (Throwable t) {

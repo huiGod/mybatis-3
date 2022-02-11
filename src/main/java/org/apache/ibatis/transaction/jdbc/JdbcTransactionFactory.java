@@ -37,6 +37,10 @@ public class JdbcTransactionFactory implements TransactionFactory {
     return new JdbcTransaction(conn);
   }
 
+  // 工厂类来创建事务实例
+  // @Param DataSource： 数据库源
+  // @Param level: 事务隔离级别,定义并发事务的处理方式。如A读时，B在写。
+  // @param autoCommit： 是否自动提交
   @Override
   public Transaction newTransaction(DataSource ds, TransactionIsolationLevel level, boolean autoCommit) {
     return new JdbcTransaction(ds, level, autoCommit);

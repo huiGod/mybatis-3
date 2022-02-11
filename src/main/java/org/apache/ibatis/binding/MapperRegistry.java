@@ -41,12 +41,16 @@ public class MapperRegistry {
   }
 
   @SuppressWarnings("unchecked")
+  // 动态代理方式创建mapper对象
   public <T> T getMapper(Class<T> type, SqlSession sqlSession) {
+    // 先从mybatis初始化，也就是创建SqlSessionFactory时，创建的MapperProxyFactory的map中取出当前mapper接口对应的MapperProxyFactory
+    // MapperProxyFactory为mapper动态代理的工厂类
     final MapperProxyFactory<T> mapperProxyFactory = (MapperProxyFactory<T>) knownMappers.get(type);
     if (mapperProxyFactory == null) {
       throw new BindingException("Type " + type + " is not known to the MapperRegistry.");
     }
     try {
+      // 利用工厂类创建mapper动态代理对象
       return mapperProxyFactory.newInstance(sqlSession);
     } catch (Exception e) {
       throw new BindingException("Error getting mapper instance. Cause: " + e, e);

@@ -677,8 +677,20 @@ public class Configuration {
     return resultSetHandler;
   }
 
+  /**
+   * 创建RoutingStatementHandler，它是StatementHandler的外观类，也是StatementHandler的一个实现类
+   * @param executor
+   * @param mappedStatement
+   * @param parameterObject
+   * @param rowBounds
+   * @param resultHandler
+   * @param boundSql
+   * @return
+   */
   public StatementHandler newStatementHandler(Executor executor, MappedStatement mappedStatement, Object parameterObject, RowBounds rowBounds, ResultHandler resultHandler, BoundSql boundSql) {
+    // 直接构造一个RoutingStatementHandler
     StatementHandler statementHandler = new RoutingStatementHandler(executor, mappedStatement, parameterObject, rowBounds, resultHandler, boundSql);
+    // 将statementHandler，添加为插件的目标执行器。插件通过配置XML文件的plugins节点设置
     statementHandler = (StatementHandler) interceptorChain.pluginAll(statementHandler);
     return statementHandler;
   }
@@ -687,10 +699,21 @@ public class Configuration {
     return newExecutor(transaction, defaultExecutorType);
   }
 
+  /**
+   * Executor是SqlSession的核心，其select update commit rollback close等方法
+   * 均由Executor代理实现。Executor代表调度器，由他来调度StatementHandler ParameterHandler ResultSetHandler。
+   * 四者合称mybatis运行时四大组件。四大组件均可由用户通过插件注入，也都有默认实现
+   * @param transaction
+   * @param executorType
+   * @return
+   */
   public Executor newExecutor(Transaction transaction, ExecutorType executorType) {
+    // executorType通过settings节点中的defaultExecutorType来设置，没有设置则默认为SIMPLE
     executorType = executorType == null ? defaultExecutorType : executorType;
     executorType = executorType == null ? ExecutorType.SIMPLE : executorType;
     Executor executor;
+
+    // 根据executorType分别创建BatchExecutor ReuseExecutor SimpleExecutor
     if (ExecutorType.BATCH == executorType) {
       executor = new BatchExecutor(this, transaction);
     } else if (ExecutorType.REUSE == executorType) {
@@ -698,9 +721,15 @@ public class Configuration {
     } else {
       executor = new SimpleExecutor(this, transaction);
     }
+
+    // 如果打开了缓存，使用CachingExecutor包装下之前创建的executor，简单理解就是为executor添加了cache功能
+    // 这里是二级缓存 namespace级别，通过装饰器设计模式对 Executor 功能增强
     if (cacheEnabled) {
       executor = new CachingExecutor(executor);
     }
+
+    // 将执行器executor设置到plugins节点中设置的所有插件中，作为插件的目标执行器
+    // 责任链设计模式
     executor = (Executor) interceptorChain.pluginAll(executor);
     return executor;
   }

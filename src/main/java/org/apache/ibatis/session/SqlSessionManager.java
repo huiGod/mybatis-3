@@ -342,6 +342,7 @@ public class SqlSessionManager implements SqlSessionFactory, SqlSession {
         // Prevent Synthetic Access
     }
 
+
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
       final SqlSession sqlSession = SqlSessionManager.this.localSqlSession.get();

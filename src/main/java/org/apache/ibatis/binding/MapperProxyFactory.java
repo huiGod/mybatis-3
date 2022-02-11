@@ -25,6 +25,7 @@ import org.apache.ibatis.session.SqlSession;
 
 /**
  * @author Lasse Voss
+ * 先创建MapperProxy类，然后创建Java动态代理对象，将mapperProxy作为它的InvocationHandler。执行动态代理方法时，会回调InvocationHandler的invoke()方法
  */
 public class MapperProxyFactory<T> {
 
@@ -44,11 +45,14 @@ public class MapperProxyFactory<T> {
   }
 
   @SuppressWarnings("unchecked")
+  // 动态代理的方式，反射生成mapper接口对象
+  // MapperProxy实现了InvocationHandler
   protected T newInstance(MapperProxy<T> mapperProxy) {
     return (T) Proxy.newProxyInstance(mapperInterface.getClassLoader(), new Class[] { mapperInterface }, mapperProxy);
   }
 
   public T newInstance(SqlSession sqlSession) {
+    // 构造MapperProxy对象，然后创建我们定义的mapper接口对应的对象
     final MapperProxy<T> mapperProxy = new MapperProxy<>(sqlSession, mapperInterface, methodCache);
     return newInstance(mapperProxy);
   }

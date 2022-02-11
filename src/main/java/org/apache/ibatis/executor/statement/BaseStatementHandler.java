@@ -80,12 +80,18 @@ public abstract class BaseStatementHandler implements StatementHandler {
     return parameterHandler;
   }
 
+  // BaseStatementHandler初始化statement并设置期相关变量，不同的StatementHandler实现不同
   @Override
   public Statement prepare(Connection connection, Integer transactionTimeout) throws SQLException {
     ErrorContext.instance().sql(boundSql.getSql());
     Statement statement = null;
     try {
+      // 初始化statement，由具体的StatementHandler来实现
+      // 比如SimpleStatementHandler通过JDBC connection的createStatement来创建
+      // 模板设计模式，具体实现由子类来实现
       statement = instantiateStatement(connection);
+
+      // 设置timeout（超时时间）和fetchSize（获取数据库的行数）
       setStatementTimeout(statement, transactionTimeout);
       setFetchSize(statement);
       return statement;

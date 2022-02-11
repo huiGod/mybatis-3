@@ -131,41 +131,58 @@ public abstract class BaseExecutor implements Executor {
 
   @Override
   public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler) throws SQLException {
+    // 从MappedStatement中找到boundSql成员变量,其中BoundSql通过sql执行语句和入参，来组装最终查询数据库用到的sql
     BoundSql boundSql = ms.getBoundSql(parameter);
+    // sql的id，逻辑分页rowBounds的offset和limit，boundSql的sql语句均相同时（主要是动态sql的存在），也就是组装后的SQL语句完全相同时，才认为是同一个cacheKey
     CacheKey key = createCacheKey(ms, parameter, rowBounds, boundSql);
     return query(ms, parameter, rowBounds, resultHandler, key, boundSql);
   }
 
   @SuppressWarnings("unchecked")
+  /**
+   * 调度器的query方法先从MappedStatement中获取BoundSql，它包含了sql语句和入参对象等变量，再构造缓存的key，即cacheKey。然后先尝试从缓存中取，缓存未命中则直接从数据库中查询。最后处理延迟加载，直接从缓存中取出查询数据即可
+   */
   @Override
   public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, CacheKey key, BoundSql boundSql) throws SQLException {
     ErrorContext.instance().resource(ms.getResource()).activity("executing a query").object(ms.getId());
     if (closed) {
       throw new ExecutorException("Executor was closed.");
     }
+
+    // flush cache, 即写入并清空cache。之后就只能从数据库中读取了，这样可以防止脏cache
+    // 如果配置了flushCacheRequired为 true，则每次都清空一级缓存
+    // localCache和localOutputParameterCache为BaseExecutor的成员变量，它们构成了mybatis的一级缓存，也就是sqlSession级别的缓存，默认是开启的。
     if (queryStack == 0 && ms.isFlushCacheRequired()) {
       clearLocalCache();
     }
+    // 从缓存或数据库中查询结果list
     List<E> list;
     try {
       queryStack++;
+      // 未定义resultHandler时，先尝试从缓存中取。
       list = resultHandler == null ? (List<E>) localCache.getObject(key) : null;
       if (list != null) {
+        // 缓存命中时，直接从本地缓存中取出即可
         handleLocallyCachedOutputParameters(ms, key, parameter, boundSql);
       } else {
+        // 缓存未命中，必须从数据库中查询
         list = queryFromDatabase(ms, parameter, rowBounds, resultHandler, key, boundSql);
       }
     } finally {
       queryStack--;
     }
+
+    // 当前所有查询语句都结束时，开始处理延迟加载
     if (queryStack == 0) {
       for (DeferredLoad deferredLoad : deferredLoads) {
+        // 延迟加载从缓存中获取结果
         deferredLoad.load();
       }
       // issue #601
       deferredLoads.clear();
       if (configuration.getLocalCacheScope() == LocalCacheScope.STATEMENT) {
         // issue #482
+        // statement级别的缓存，只缓存id相同的sql。当所有查询语句和延迟加载的查询语句均执行完毕后，可清空cache。这样可节约内存
         clearLocalCache();
       }
     }
@@ -320,12 +337,17 @@ public abstract class BaseExecutor implements Executor {
 
   private <E> List<E> queryFromDatabase(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, CacheKey key, BoundSql boundSql) throws SQLException {
     List<E> list;
+    // 先利用占位符将本次查询设置到本地cache中，个人理解是防止后面延迟加载时cache为空
     localCache.putObject(key, EXECUTION_PLACEHOLDER);
     try {
+      // 真正的数据库查询
       list = doQuery(ms, parameter, rowBounds, resultHandler, boundSql);
     } finally {
+      // 查到了结果后，将前面的占位符的cache删掉
       localCache.removeObject(key);
     }
+
+    // 将查询结果放到本地cache中缓存起来
     localCache.putObject(key, list);
     if (ms.getStatementType() == StatementType.CALLABLE) {
       localOutputParameterCache.putObject(key, parameter);
@@ -333,6 +355,7 @@ public abstract class BaseExecutor implements Executor {
     return list;
   }
 
+  //JdbcTransaction和ManagedTransaction都是直接调用dataSource的getConnection
   protected Connection getConnection(Log statementLog) throws SQLException {
     Connection connection = transaction.getConnection();
     if (statementLog.isDebugEnabled()) {

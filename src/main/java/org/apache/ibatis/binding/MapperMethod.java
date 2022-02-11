@@ -73,16 +73,22 @@ public class MapperMethod {
         break;
       }
       case SELECT:
+        // 根据select返回值的不同，调用对应的不同方法来查询，其实本质上大同小异，最后都是调用了sqlSession的select方法
         if (method.returnsVoid() && method.hasResultHandler()) {
+          // 无需返回值时
           executeWithResultHandler(sqlSession, args);
           result = null;
         } else if (method.returnsMany()) {
+          // 返回值为Collection集合类型或者数组类型时
           result = executeForMany(sqlSession, args);
         } else if (method.returnsMap()) {
+          // 返回值为Map类型时
           result = executeForMap(sqlSession, args);
         } else if (method.returnsCursor()) {
+          // 返回值为Cursor类型时
           result = executeForCursor(sqlSession, args);
         } else {
+          // 返回值为其他类型时，认为不是集合类型，故调用selectOne返回一个对象
           Object param = method.convertArgsToSqlCommandParam(args);
           result = sqlSession.selectOne(command.getName(), param);
           if (method.returnsOptional()
@@ -139,7 +145,9 @@ public class MapperMethod {
 
   private <E> Object executeForMany(SqlSession sqlSession, Object[] args) {
     List<E> result;
+    // 调用paramNameResolver，处理入参
     Object param = method.convertArgsToSqlCommandParam(args);
+    // mapper方式最终还是通过sqlSession操作数据库
     if (method.hasRowBounds()) {
       RowBounds rowBounds = method.extractRowBounds(args);
       result = sqlSession.selectList(command.getName(), param, rowBounds);
@@ -147,6 +155,7 @@ public class MapperMethod {
       result = sqlSession.selectList(command.getName(), param);
     }
     // issue #510 Collections & arrays support
+    // 由于selectList返回的是List类型的集合，而mapper接口中的方法返回值可能为Set Queue等其他集合类型，故此处需要做转换
     if (!method.getReturnType().isAssignableFrom(result.getClass())) {
       if (method.getReturnType().isArray()) {
         return convertToArray(result);
